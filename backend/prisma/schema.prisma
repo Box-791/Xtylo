@@ -1,28 +1,81 @@
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-model Student {
-  id         String   @id @default(uuid())
-  firstName  String
-  lastName   String
-  email      String
-  phone      String?
-  highSchool String
-  campaign   String
-  status     String   @default("NEW")
-  createdAt  DateTime @default(now())
+model School {
+  id        Int       @id @default(autoincrement())
+  name      String
+  city      String?
+  state     String?
+  createdAt DateTime  @default(now())
+
+  students  Student[]
 }
 
-model AdminUser {
-  id           String @id @default(uuid())
-  email        String @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
+model Campaign {
+  id          Int       @id @default(autoincrement())
+  name        String
+  startDate  DateTime
+  endDate    DateTime?
+  createdAt  DateTime  @default(now())
+
+  students   Student[]
+  messages   OutreachMessage[]
+}
+
+model Student {
+  id          Int       @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  createdAt   DateTime  @default(now())
+
+  schoolId    Int
+  campaignId  Int
+
+  school      School    @relation(fields: [schoolId], references: [id])
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+
+  outreachLogs OutreachLog[]
+}
+
+model OutreachMessage {
+  id          Int       @id @default(autoincrement())
+  subject     String?
+  body        String
+  channel     OutreachChannel
+  createdAt   DateTime  @default(now())
+
+  campaignId  Int
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+
+  logs        OutreachLog[]
+}
+
+model OutreachLog {
+  id          Int       @id @default(autoincrement())
+  sentAt      DateTime  @default(now())
+  status      OutreachStatus
+
+  studentId   Int
+  messageId   Int
+
+  student     Student   @relation(fields: [studentId], references: [id])
+  message     OutreachMessage @relation(fields: [messageId], references: [id])
+}
+
+enum OutreachChannel {
+  EMAIL
+  SMS
+}
+
+enum OutreachStatus {
+  SENT
+  FAILED
 }
