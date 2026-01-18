@@ -22,22 +22,13 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const {
-    firstName,
-    lastName,
-    email,
-    phone,
-    schoolId,
-    campaignId,
-  } = req.body;
-
-  if (!firstName || !lastName || !schoolId || !campaignId) {
-    return res.status(400).json({
-      error: "Missing required fields",
-    });
-  }
-
   try {
+    const { firstName, lastName, email, phone, schoolId, campaignId } = req.body;
+
+    if (!firstName || !lastName || !schoolId || !campaignId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     const student = await prisma.student.create({
       data: {
         firstName,
@@ -59,6 +50,5 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to create student" });
   }
 });
-
 
 export default router;
