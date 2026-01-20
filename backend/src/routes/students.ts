@@ -5,7 +5,7 @@ const router = Router();
 
 /**
  * GET /students
- * Optional filters: schoolId, campaignId
+ * Admin-only list
  */
 router.get("/", async (req, res) => {
   const { schoolId, campaignId } = req.query;
@@ -27,32 +27,40 @@ router.get("/", async (req, res) => {
 
 /**
  * POST /students
- * Used by PUBLIC intake (iPad)
+ * PUBLIC intake (iPad)
+ * Campaign is AUTO-ASSIGNED
  */
 router.post("/", async (req, res) => {
-  try {
-    const { firstName, lastName, email, phone, schoolId, campaignId } = req.body;
+  const { firstName, lastName, email, phone, schoolId } = req.body;
 
-    if (!firstName || !lastName || !schoolId || !campaignId) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const student = await prisma.student.create({
-      data: {
-        firstName,
-        lastName,
-        email,
-        phone,
-        schoolId: Number(schoolId),
-        campaignId: Number(campaignId),
-      },
-    });
-
-    res.status(201).json(student);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create student" });
+  if (!firstName || !lastName || !schoolId) {
+    return res.status(400).json({ error: "Missing required fields" });
   }
+
+  const activeCampaign = await prisma.campaign.findFirst({
+    where: { isActive: true },
+  });
+
+  if (!activeCampaign) {
+    return res.status(400).json({ error: "No active campaign" });
+  }
+
+  const student = await prisma.student.create({
+    data: {
+      firstName,
+      lastName,
+      email,
+      phone,
+      schoolId: Number(schoolId),
+      campaignId: activeCampaign.id,
+    },
+    include: {
+      school: true,
+      campaign: true,
+    },
+  });
+
+  res.status(201).json(student);
 });
 
 /**
@@ -75,7 +83,6 @@ router.put("/:id", async (req, res) => {
  */
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
-
   await prisma.student.delete({ where: { id } });
   res.status(204).end();
 });

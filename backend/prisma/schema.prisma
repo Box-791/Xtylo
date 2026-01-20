@@ -8,66 +8,63 @@ generator client {
 }
 
 model School {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   name      String
   city      String?
   state     String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  students  Student[]
+  students Student[]
 }
 
 model Campaign {
-  id          Int       @id @default(autoincrement())
-  name        String
-  startDate  DateTime
-  endDate    DateTime?
-  createdAt  DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  name      String
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
 
-  students   Student[]
-  messages   OutreachMessage[]
+  students Student[] // ✅ inverse of Student.campaign
+  messages OutreachMessage[] // ✅ inverse of OutreachMessage.campaign
 }
 
 model Student {
-  id          Int       @id @default(autoincrement())
-  firstName   String
-  lastName    String
-  email       String?
-  phone       String?
-  createdAt   DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
 
-  schoolId    Int
-  campaignId  Int
+  schoolId   Int
+  campaignId Int
 
-  school      School    @relation(fields: [schoolId], references: [id])
-  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  school   School   @relation(fields: [schoolId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
 
   outreachLogs OutreachLog[]
 }
 
 model OutreachMessage {
-  id          Int       @id @default(autoincrement())
-  subject     String?
-  body        String
-  channel     OutreachChannel
-  createdAt   DateTime  @default(now())
+  id         Int      @id @default(autoincrement())
+  studentId  Int
+  campaignId Int
+  message    String
+  sentAt     DateTime @default(now())
 
-  campaignId  Int
-  campaign    Campaign  @relation(fields: [campaignId], references: [id])
-
-  logs        OutreachLog[]
+  campaign Campaign      @relation(fields: [campaignId], references: [id])
+  logs     OutreachLog[] // ✅ inverse of OutreachLog.message
 }
 
 model OutreachLog {
-  id          Int       @id @default(autoincrement())
-  sentAt      DateTime  @default(now())
-  status      OutreachStatus
+  id     Int            @id @default(autoincrement())
+  sentAt DateTime       @default(now())
+  status OutreachStatus
 
-  studentId   Int
-  messageId   Int
+  studentId Int
+  messageId Int
 
-  student     Student   @relation(fields: [studentId], references: [id])
-  message     OutreachMessage @relation(fields: [messageId], references: [id])
+  student Student         @relation(fields: [studentId], references: [id])
+  message OutreachMessage @relation(fields: [messageId], references: [id])
 }
 
 enum OutreachChannel {

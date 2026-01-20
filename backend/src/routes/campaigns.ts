@@ -3,12 +3,53 @@ import { prisma } from "../lib/prisma";
 
 const router = Router();
 
+// Get all campaigns
 router.get("/", async (_req, res) => {
   const campaigns = await prisma.campaign.findMany({
-    orderBy: { startDate: "desc" },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(campaigns);
+});
+
+// Create campaign
+router.post("/", async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "Name required" });
+
+  const campaign = await prisma.campaign.create({
+    data: { name },
   });
 
-  res.json(campaigns);
+  res.status(201).json(campaign);
+});
+
+// Activate campaign (only one active)
+router.post("/:id/activate", async (req, res) => {
+  const id = Number(req.params.id);
+
+  await prisma.campaign.updateMany({
+    data: { isActive: false },
+  });
+
+  const campaign = await prisma.campaign.update({
+    where: { id },
+    data: { isActive: true },
+  });
+
+  res.json(campaign);
+});
+
+// Get active campaign
+router.get("/active", async (_req, res) => {
+  const campaign = await prisma.campaign.findFirst({
+    where: { isActive: true },
+  });
+
+  if (!campaign) {
+    return res.status(404).json({ error: "No active campaign" });
+  }
+
+  res.json(campaign);
 });
 
 export default router;
