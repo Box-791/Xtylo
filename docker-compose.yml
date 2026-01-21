@@ -1,17 +1,18 @@
-version: "3.8"
+version: "3.9"
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: xtylo_postgres
-    ports:
-      - "5432:5432"
+  backend:
+    build: ./backend
     environment:
-      POSTGRES_USER: xtylo
-      POSTGRES_PASSWORD: xtylo_pass
-      POSTGRES_DB: xtylo_db
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      - DATABASE_URL=${DATABASE_URL}
+      - ADMIN_PIN=${ADMIN_PIN}
+      - PORT=4000
+    ports:
+      - "4000:4000"
 
-volumes:
-  pgdata:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

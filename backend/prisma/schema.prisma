@@ -23,8 +23,8 @@ model Campaign {
   isActive  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  students Student[] // ✅ inverse of Student.campaign
-  messages OutreachMessage[] // ✅ inverse of OutreachMessage.campaign
+  students Student[]
+  messages OutreachMessage[]
 }
 
 model Student {
@@ -33,6 +33,7 @@ model Student {
   lastName  String
   email     String?
   phone     String?
+  consent   Boolean  @default(false)
   createdAt DateTime @default(now())
 
   schoolId   Int
@@ -42,6 +43,10 @@ model Student {
   campaign Campaign @relation(fields: [campaignId], references: [id])
 
   outreachLogs OutreachLog[]
+
+  @@index([campaignId])
+  @@index([email])
+  @@index([phone])
 }
 
 model OutreachMessage {
@@ -52,7 +57,7 @@ model OutreachMessage {
   sentAt     DateTime @default(now())
 
   campaign Campaign      @relation(fields: [campaignId], references: [id])
-  logs     OutreachLog[] // ✅ inverse of OutreachLog.message
+  logs     OutreachLog[]
 }
 
 model OutreachLog {
