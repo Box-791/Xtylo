@@ -18,10 +18,12 @@ function normalizePhone(phone: string) {
 export default function PublicIntake() {
   const [schools, setSchools] = useState<School[]>([]);
   const [campaign, setCampaign] = useState<{ id: number; name: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const [submitted, setSubmitted] = useState(false);
-  const timerRef = useRef<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const successTimerRef = useRef<number | null>(null);
   const firstRef = useRef<HTMLInputElement | null>(null);
 
   const [form, setForm] = useState({
@@ -33,6 +35,20 @@ export default function PublicIntake() {
     consent: false,
   });
 
+  function hardResetForm() {
+    setForm({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      schoolId: "",
+      consent: false,
+    });
+    setError(null);
+    // keep success banner visible briefly, but focus immediately:
+    setTimeout(() => firstRef.current?.focus(), 0);
+  }
+
   async function load() {
     setError(null);
     try {
@@ -41,13 +57,15 @@ export default function PublicIntake() {
       setCampaign(active);
     } catch {
       setError("System is not ready. Ask the presenter to activate a campaign.");
+      setCampaign(null);
     }
   }
 
   useEffect(() => {
     load();
+
     return () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current);
+      if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
     };
   }, []);
 
@@ -66,35 +84,29 @@ export default function PublicIntake() {
         form.schoolId &&
         form.consent &&
         hasContact &&
-        isValidEmail(form.email)
+        isValidEmail(form.email) &&
+        !submitting
     );
-  }, [campaign, form]);
-
-  function resetForm() {
-    setForm({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      schoolId: "",
-      consent: false,
-    });
-    setSubmitted(false);
-    setError(null);
-    firstRef.current?.focus();
-  }
+  }, [campaign, form, submitting]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
+
+    if (submitting) return;
 
     if (!campaign) return setError("No active campaign. Ask the presenter to activate a campaign.");
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.schoolId) {
+      return setError("Please fill First Name, Last Name, and School.");
+    }
     if (!isValidEmail(form.email)) return setError("Please enter a valid email address.");
 
     const phoneNorm = normalizePhone(form.phone);
     if (!form.email.trim() && !phoneNorm) return setError("Provide at least an email or a phone number.");
     if (!form.consent) return setError("Please check the consent box.");
 
+    setSubmitting(true);
     try {
       await createStudent({
         firstName: form.firstName.trim(),
@@ -105,23 +117,17 @@ export default function PublicIntake() {
         consent: true,
       });
 
-      setSubmitted(true);
-      timerRef.current = window.setTimeout(() => resetForm(), 2200);
+      // ✅ show success, reset immediately so next student can enter right away
+      setSuccess("Submitted! Hand the iPad to the next student.");
+      hardResetForm();
+
+      if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
+      successTimerRef.current = window.setTimeout(() => setSuccess(null), 1500);
     } catch (e: any) {
       setError(e?.message || "Failed to submit. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-  }
-
-  if (submitted) {
-    return (
-      <div className="container" style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
-        <div className="card" style={{ textAlign: "center", padding: 30, width: "min(620px, 100%)" }}>
-          <div style={{ fontSize: 64 }}>✅</div>
-          <h1 style={{ marginTop: 8 }}>Submitted!</h1>
-          <small>Thank you — you can hand the iPad back.</small>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -146,10 +152,24 @@ export default function PublicIntake() {
               )}
             </small>
           </div>
-          <button type="button" className="btn" onClick={load}>
+          <button type="button" className="btn" onClick={load} disabled={submitting}>
             Refresh
           </button>
         </div>
+
+        {success && (
+          <div
+            className="card"
+            style={{
+              marginTop: 14,
+              background: "rgba(34,197,94,0.12)",
+              borderColor: "rgba(34,197,94,0.45)",
+              padding: 14,
+            }}
+          >
+            <strong style={{ color: "#bbf7d0" }}>✅ {success}</strong>
+          </div>
+        )}
 
         {error && (
           <div
@@ -230,9 +250,9 @@ export default function PublicIntake() {
 
           <div className="spread" style={{ gap: 12 }}>
             <button className="btn primary" disabled={!canSubmit} type="submit" style={{ padding: 14, fontSize: 18 }}>
-              Submit
+              {submitting ? "Submitting..." : "Submit"}
             </button>
-            <button className="btn" type="button" onClick={resetForm} style={{ padding: 14, fontSize: 18 }}>
+            <button className="btn" type="button" onClick={hardResetForm} style={{ padding: 14, fontSize: 18 }} disabled={submitting}>
               Clear
             </button>
           </div>
