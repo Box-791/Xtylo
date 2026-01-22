@@ -1,18 +1,43 @@
-version: "3.9"
-
 services:
-  backend:
-    build: ./backend
+  db:
+    image: postgres:16
+    container_name: xtylo_db
+    restart: unless-stopped
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - ADMIN_PIN=${ADMIN_PIN}
-      - PORT=4000
+      POSTGRES_USER: xtylo
+      POSTGRES_PASSWORD: xtylo_pass
+      POSTGRES_DB: xtylo_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
     ports:
-      - "4000:4000"
+      - "5432:5432" # optional; remove if you do NOT want DB reachable from outside
 
-  frontend:
-    build: ./frontend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: xtylo_backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      PORT: "4000"
+      DATABASE_URL: "postgresql://xtylo:xtylo_pass@db:5432/xtylo_db"
+      ADMIN_PIN: "1234"
+      NODE_ENV: "production"
     ports:
-      - "80:80"
+      - "4000:4000" # optional; keep for debugging; can remove later
+
+  web:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: xtylo_web
+    restart: unless-stopped
     depends_on:
       - backend
+    ports:
+      - "80:80"
+
+volumes:
+  db_data:
