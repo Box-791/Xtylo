@@ -14,6 +14,8 @@ import {
   exportCSV,
 } from "./api";
 
+import AdminSchools from "./AdminSchools"
+
 interface School {
   id: number;
   name: string;

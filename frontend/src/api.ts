@@ -1,38 +1,49 @@
-const DEV_API = "http://localhost:4000";
-const API_URL = import.meta.env.DEV ? DEV_API : "/api";
+// Use localhost in dev, nginx proxy (/api) in production docker.
+const API_URL = import.meta.env.DEV ? "http://localhost:4000" : "/api";
 
-function getAdminPin() {
-  return localStorage.getItem("ADMIN_PIN") || "";
+export interface School {
+  id: number;
+  name: string;
+  city?: string | null;
+  state?: string | null;
 }
 
-async function adminFetch(path: string, init: RequestInit = {}) {
-  const headers = new Headers(init.headers || {});
-  headers.set("x-admin-pin", getAdminPin());
-  if (!headers.has("Content-Type") && init.method && init.method !== "GET") {
-    headers.set("Content-Type", "application/json");
-  }
+export interface Campaign {
+  id: number;
+  name: string;
+  isActive?: boolean;
+  createdAt?: string;
+}
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+export interface Student {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  createdAt?: string;
+  school: { id: number; name: string };
+  campaign: { id: number; name: string };
+}
 
+async function jsonOrThrow(res: Response) {
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Request failed: ${res.status}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Request failed (${res.status})`);
   }
-
-  return res;
-}
-
-/** PUBLIC */
-export async function fetchSchools() {
-  const res = await fetch(`${API_URL}/schools`);
-  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function fetchActiveCampaign() {
-  const res = await fetch(`${API_URL}/campaigns/active`);
-  if (!res.ok) return null;
-  return res.json();
+/* =========================
+   STUDENTS
+   ========================= */
+export async function fetchStudents(params?: { schoolId?: number; campaignId?: number }) {
+  const query = new URLSearchParams();
+  if (params?.schoolId) query.append("schoolId", String(params.schoolId));
+  if (params?.campaignId) query.append("campaignId", String(params.campaignId));
+
+  const res = await fetch(`${API_URL}/students?${query.toString()}`);
+  return jsonOrThrow(res) as Promise<Student[]>;
 }
 
 export async function createStudent(data: {
@@ -41,99 +52,83 @@ export async function createStudent(data: {
   email?: string;
   phone?: string;
   schoolId: number;
-  consent?: boolean;
+  // NOTE: kiosk/public intake should not pass campaignId; backend assigns active campaign
+  campaignId?: number;
 }) {
   const res = await fetch(`${API_URL}/students`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+
+  return jsonOrThrow(res);
 }
 
-/** ADMIN */
-export async function fetchStudents(params?: { schoolId?: number; campaignId?: number }) {
-  const query = new URLSearchParams();
-  if (params?.schoolId) query.append("schoolId", String(params.schoolId));
-  if (params?.campaignId) query.append("campaignId", String(params.campaignId));
-
-  const res = await adminFetch(`/students?${query.toString()}`);
-  return res.json();
-}
-
-export async function updateStudent(
-  id: number,
-  data: { firstName?: string; lastName?: string; email?: string; phone?: string; schoolId?: number }
-) {
-  const res = await adminFetch(`/students/${id}`, {
+export async function updateStudent(id: number, data: Partial<{ firstName: string; lastName: string; email: string | null; phone: string | null }>) {
+  const res = await fetch(`${API_URL}/students/${id}`, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  return res.json();
+
+  return jsonOrThrow(res);
 }
 
 export async function deleteStudent(id: number) {
-  await adminFetch(`/students/${id}`, { method: "DELETE" });
+  const res = await fetch(`${API_URL}/students/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete student (${res.status})`);
 }
 
-export async function fetchCampaigns() {
-  const res = await adminFetch(`/campaigns`);
-  return res.json();
-}
-
-export async function createCampaign(name: string) {
-  const res = await adminFetch(`/campaigns`, {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
-  return res.json();
-}
-
-export async function activateCampaign(id: number) {
-  const res = await adminFetch(`/campaigns/${id}/activate`, { method: "POST" });
-  return res.json();
-}
-
-export async function deactivateCampaign(id: number) {
-  const res = await adminFetch(`/campaigns/${id}/deactivate`, { method: "POST" });
-  return res.json();
-}
-
-export async function deactivateAllCampaigns() {
-  const res = await adminFetch(`/campaigns/deactivate`, { method: "POST" });
-  return res.json();
-}
-
-export async function deleteCampaign(id: number) {
-  await adminFetch(`/campaigns/${id}`, { method: "DELETE" });
+/* =========================
+   SCHOOLS
+   ========================= */
+export async function fetchSchools() {
+  const res = await fetch(`${API_URL}/schools`);
+  return jsonOrThrow(res) as Promise<School[]>;
 }
 
 export async function createSchool(data: { name: string; city?: string; state?: string }) {
-  const res = await adminFetch(`/schools`, {
+  const res = await fetch(`${API_URL}/schools`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  return res.json();
+
+  return jsonOrThrow(res) as Promise<School>;
 }
 
 export async function deleteSchool(id: number) {
-  await adminFetch(`/schools/${id}`, { method: "DELETE" });
+  const res = await fetch(`${API_URL}/schools/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete school (${res.status})`);
 }
 
-/**
- * ADMIN: Export CSV
- * If campaignId is provided -> exports ONLY that campaign
- */
-export async function exportCSV(campaignId?: number) {
-  const qs = campaignId ? `?campaignId=${campaignId}` : "";
-  const res = await adminFetch(`/students/export/csv${qs}`);
+/* =========================
+   CAMPAIGNS
+   ========================= */
+export async function fetchCampaigns() {
+  const res = await fetch(`${API_URL}/campaigns`);
+  return jsonOrThrow(res) as Promise<Campaign[]>;
+}
 
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = campaignId ? `students_campaign_${campaignId}.csv` : "students_all.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+export async function fetchActiveCampaign() {
+  const res = await fetch(`${API_URL}/campaigns/active`);
+  return jsonOrThrow(res) as Promise<Campaign>;
+}
+
+export async function activateCampaign(id: number) {
+  const res = await fetch(`${API_URL}/campaigns/${id}/activate`, { method: "POST" });
+  return jsonOrThrow(res) as Promise<Campaign>;
+}
+
+export async function deactivateAllCampaigns() {
+  // Optional helper if you implement it on backend later.
+  // Leaving here for compatibility; you can remove if unused.
+  return;
+}
+
+export function exportCSV(params?: { schoolId?: number; campaignId?: number }) {
+  const query = new URLSearchParams();
+  if (params?.schoolId) query.append("schoolId", String(params.schoolId));
+  if (params?.campaignId) query.append("campaignId", String(params.campaignId));
+  window.open(`${API_URL}/students/export/csv?${query.toString()}`, "_blank");
 }

@@ -1,10 +1,17 @@
-FROM node:20-alpine
+FROM node:20-bullseye-slim
 
 WORKDIR /app
 
-# Install deps
-COPY package*.json ./
-RUN npm ci
+# Install OpenSSL + pg_isready dependency
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates postgresql-client \
+  && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install deps (tolerates lockfile drift)
+RUN npm install
 
 # Copy backend source
 COPY . .
@@ -15,4 +22,5 @@ RUN npm run build
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Wait for DB -> run migrations -> start server
+CMD ["sh", "-c", "until pg_isready -h db -p 5432 -U xtylo; do echo 'Waiting for Postgres...'; sleep 1; done; npx prisma migrate deploy && node dist/server.js"]

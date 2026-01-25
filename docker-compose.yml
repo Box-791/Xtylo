@@ -9,8 +9,9 @@ services:
       POSTGRES_DB: xtylo_db
     volumes:
       - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432" # optional; remove if you do NOT want DB reachable from outside
+    # ✅ DO NOT expose 5432 on the host (avoids conflict)
+    # ports:
+    #   - "5432:5432"
 
   backend:
     build:
@@ -25,8 +26,9 @@ services:
       DATABASE_URL: "postgresql://xtylo:xtylo_pass@db:5432/xtylo_db"
       ADMIN_PIN: "1234"
       NODE_ENV: "production"
+    # Optional host port for debugging; keep or remove
     ports:
-      - "4000:4000" # optional; keep for debugging; can remove later
+      - "4000:4000"
 
   web:
     build:
