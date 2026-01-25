@@ -1,0 +1,125 @@
+/* Kiosk/Public Intake form ONLY */
+
+.pi-card {
+  width: min(860px, 96vw);
+  margin: 0 auto;
+  padding: 22px;
+}
+
+.pi-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.pi-title {
+  margin: 0;
+}
+
+.pi-sub {
+  margin-top: 6px;
+  line-height: 1.3;
+  opacity: 0.95;
+}
+
+.pi-subLabel {
+  opacity: 0.9;
+}
+
+.pi-error {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fecaca;
+}
+
+.pi-form {
+  margin-top: 16px;
+}
+
+.pi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+}
+
+@media (max-width: 720px) {
+  .pi-grid {
+    grid-template-columns: 1fr;
+  }
+  .pi-card {
+    padding: 18px;
+  }
+}
+
+.pi-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pi-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  opacity: 0.95;
+}
+
+.pi-required {
+  color: rgba(167, 139, 250, 1);
+  font-weight: 700;
+}
+
+.pi-help {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+.pi-consent {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+
+.pi-consentRow {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: start;
+  gap: 10px;
+}
+
+.pi-consentText {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.pi-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pi-actions .btn {
+  min-width: 140px;
+}
+
+@media (max-width: 520px) {
+  .pi-actions {
+    flex-direction: column;
+  }
+  .pi-actions .btn {
+    width: 100%;
+  }
+}
+
+.pi-foot {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}

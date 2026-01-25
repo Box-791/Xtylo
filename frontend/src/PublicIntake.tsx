@@ -1,265 +1,280 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchActiveCampaign, fetchSchools, createStudent } from "./api";
+import { useEffect, useMemo, useState } from "react";
+import {
+  fetchSchools,
+  createStudent,
+  AreaOfInterest,
+  AREA_OF_INTEREST_LABEL,
+} from "./api";
 
-interface School {
+type School = {
   id: number;
   name: string;
-}
-
-function isValidEmail(email: string) {
-  if (!email) return true;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function normalizePhone(phone: string) {
-  return phone.replace(/[^\d]/g, "").slice(0, 15);
-}
+  city?: string | null;
+  state?: string | null;
+};
 
 export default function PublicIntake() {
   const [schools, setSchools] = useState<School[]>([]);
-  const [campaign, setCampaign] = useState<{ id: number; name: string } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [schoolId, setSchoolId] = useState<number | "">("");
+  const [areaOfInterest, setAreaOfInterest] = useState<AreaOfInterest>(
+    AreaOfInterest.COSMETOLOGY
+  );
+  const [consent, setConsent] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
-
-  const successTimerRef = useRef<number | null>(null);
-  const firstRef = useRef<HTMLInputElement | null>(null);
-
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    schoolId: "",
-    consent: false,
-  });
-
-  function hardResetForm() {
-    setForm({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      schoolId: "",
-      consent: false,
-    });
-    setError(null);
-    // keep success banner visible briefly, but focus immediately:
-    setTimeout(() => firstRef.current?.focus(), 0);
-  }
-
-  async function load() {
-    setError(null);
-    try {
-      const [sc, active] = await Promise.all([fetchSchools(), fetchActiveCampaign()]);
-      setSchools(sc);
-      setCampaign(active);
-    } catch {
-      setError("System is not ready. Ask the presenter to activate a campaign.");
-      setCampaign(null);
-    }
-  }
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
 
   useEffect(() => {
-    load();
-
-    return () => {
-      if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
-    };
+    setLoading(true);
+    fetchSchools()
+      .then(setSchools)
+      .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    firstRef.current?.focus();
-  }, [campaign]);
-
   const canSubmit = useMemo(() => {
-    const phoneNorm = normalizePhone(form.phone);
-    const hasContact = Boolean(form.email.trim() || phoneNorm);
-
-    return Boolean(
-      campaign &&
-        form.firstName.trim() &&
-        form.lastName.trim() &&
-        form.schoolId &&
-        form.consent &&
-        hasContact &&
-        isValidEmail(form.email) &&
-        !submitting
-    );
-  }, [campaign, form, submitting]);
+    const first = firstName.trim();
+    const last = lastName.trim();
+    const hasContact = email.trim() !== "" || phone.trim() !== "";
+    return Boolean(first && last && schoolId !== "" && hasContact && !submitting);
+  }, [firstName, lastName, email, phone, schoolId, submitting]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
+    setOk(null);
 
-    if (submitting) return;
+    const first = firstName.trim();
+    const last = lastName.trim();
+    const emailStr = email.trim();
+    const phoneStr = phone.trim();
 
-    if (!campaign) return setError("No active campaign. Ask the presenter to activate a campaign.");
-    if (!form.firstName.trim() || !form.lastName.trim() || !form.schoolId) {
-      return setError("Please fill First Name, Last Name, and School.");
+    if (!first || !last || schoolId === "") {
+      setError("First name, last name, and school are required.");
+      return;
     }
-    if (!isValidEmail(form.email)) return setError("Please enter a valid email address.");
 
-    const phoneNorm = normalizePhone(form.phone);
-    if (!form.email.trim() && !phoneNorm) return setError("Provide at least an email or a phone number.");
-    if (!form.consent) return setError("Please check the consent box.");
+    if (!emailStr && !phoneStr) {
+      setError("Please enter either an email or a phone number.");
+      return;
+    }
 
-    setSubmitting(true);
     try {
+      setSubmitting(true);
+
       await createStudent({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.trim() || undefined,
-        phone: phoneNorm || undefined,
-        schoolId: Number(form.schoolId),
-        consent: true,
+        firstName: first,
+        lastName: last,
+        email: emailStr || undefined,
+        phone: phoneStr || undefined,
+        schoolId: Number(schoolId),
+        areaOfInterest,
+        consent,
       });
 
-      // ✅ show success, reset immediately so next student can enter right away
-      setSuccess("Submitted! Hand the iPad to the next student.");
-      hardResetForm();
+      setOk("Thank you! Your information was submitted.");
 
-      if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
-      successTimerRef.current = window.setTimeout(() => setSuccess(null), 1500);
+      // reset
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhone("");
+      setSchoolId("");
+      setAreaOfInterest(AreaOfInterest.COSMETOLOGY);
+      setConsent(false);
     } catch (e: any) {
-      setError(e?.message || "Failed to submit. Please try again.");
+      setError(e?.message || "Could not submit. Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="container" style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
-      <form
-        onSubmit={submit}
+    <div className="container">
+      <div
         className="card"
         style={{
-          width: "min(780px, 100%)",
-          padding: 22,
+          width: "min(820px, 100%)",
+          margin: "0 auto",
+          padding: 20,
         }}
       >
-        <div className="spread" style={{ gap: 16 }}>
-          <div>
-            <h1 style={{ marginBottom: 6 }}>Beauty School Interest Form</h1>
-            <small>
-              Campaign:{" "}
-              {campaign ? (
-                <span className="badge good">{campaign.name}</span>
-              ) : (
-                <span className="badge warn">Not active</span>
+        <h1 style={{ marginBottom: 6 }}>Interested in Beauty School?</h1>
+        <small>Please fill out the form below. Email or phone is required.</small>
+
+        <div style={{ height: 16 }} />
+
+        {loading ? (
+          <p>Loading...</p>
+        ) : (
+          <form onSubmit={submit}>
+            {/* GRID */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(12, 1fr)",
+                gap: 12,
+              }}
+            >
+              {/* First Name */}
+              <div style={{ gridColumn: "span 12" }}>
+                <label className="label">First Name</label>
+                <input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First name"
+                  autoComplete="given-name"
+                />
+              </div>
+
+              {/* Last Name */}
+              <div style={{ gridColumn: "span 12" }}>
+                <label className="label">Last Name</label>
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last name"
+                  autoComplete="family-name"
+                />
+              </div>
+
+              {/* On wider screens, use 2 columns */}
+              <style>
+                {`
+                  @media (min-width: 720px) {
+                    .kiosk-col-6 { grid-column: span 6 !important; }
+                    .kiosk-col-12 { grid-column: span 12 !important; }
+                  }
+                `}
+              </style>
+
+              {/* Email */}
+              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
+                <label className="label">Email</label>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  autoComplete="email"
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
+                <label className="label">Phone</label>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(###) ###-####"
+                  autoComplete="tel"
+                />
+              </div>
+
+              {/* School */}
+              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
+                <label className="label">School</label>
+                <select
+                  value={schoolId}
+                  onChange={(e) =>
+                    setSchoolId(e.target.value ? Number(e.target.value) : "")
+                  }
+                >
+                  <option value="">Select a school</option>
+                  {schools.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {s.city || s.state
+                        ? ` — ${s.city ?? ""}${s.city && s.state ? ", " : ""}${
+                            s.state ?? ""
+                          }`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Area of Interest */}
+              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
+                <label className="label">Area of Interest</label>
+                <select
+                  value={areaOfInterest}
+                  onChange={(e) =>
+                    setAreaOfInterest(e.target.value as AreaOfInterest)
+                  }
+                >
+                  {Object.values(AreaOfInterest).map((v) => (
+                    <option key={v} value={v}>
+                      {AREA_OF_INTEREST_LABEL[v]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Consent */}
+              <div className="kiosk-col-12" style={{ gridColumn: "span 12" }}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8, // closer spacing between checkbox and text
+                    padding: "10px 12px",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    borderRadius: 12,
+                    userSelect: "none",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    style={{
+                      width: 18,
+                      height: 18,
+                      margin: 0, // removes default spacing that can cause "far apart"
+                    }}
+                  />
+                  <span style={{ lineHeight: 1.2 }}>
+                    I agree to be contacted by Xtylo.
+                  </span>
+                </label>
+              </div>
+
+              {/* Messages */}
+              {error && (
+                <div style={{ gridColumn: "span 12", color: "#fecaca" }}>
+                  <strong>Error:</strong> {error}
+                </div>
               )}
-            </small>
-          </div>
-          <button type="button" className="btn" onClick={load} disabled={submitting}>
-            Refresh
-          </button>
-        </div>
 
-        {success && (
-          <div
-            className="card"
-            style={{
-              marginTop: 14,
-              background: "rgba(34,197,94,0.12)",
-              borderColor: "rgba(34,197,94,0.45)",
-              padding: 14,
-            }}
-          >
-            <strong style={{ color: "#bbf7d0" }}>✅ {success}</strong>
-          </div>
+              {ok && (
+                <div style={{ gridColumn: "span 12", color: "#bbf7d0" }}>
+                  <strong>{ok}</strong>
+                </div>
+              )}
+
+              {/* Submit */}
+              <div
+                style={{
+                  gridColumn: "span 12",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: 6,
+                }}
+              >
+                <button className="btn primary" type="submit" disabled={!canSubmit}>
+                  {submitting ? "Submitting..." : "Submit"}
+                </button>
+              </div>
+            </div>
+          </form>
         )}
-
-        {error && (
-          <div
-            className="card"
-            style={{
-              marginTop: 14,
-              background: "rgba(239,68,68,0.12)",
-              borderColor: "rgba(239,68,68,0.45)",
-              padding: 14,
-            }}
-          >
-            <strong style={{ color: "#fecaca" }}>Error:</strong>{" "}
-            <span style={{ color: "#fecaca", whiteSpace: "pre-wrap" }}>{error}</span>
-          </div>
-        )}
-
-        <div style={{ marginTop: 14, display: "grid", gap: 14 }}>
-          <div className="kioskTwoCol">
-            <input
-              ref={firstRef}
-              placeholder="First Name *"
-              value={form.firstName}
-              onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-              required
-              style={{ padding: 16, fontSize: 18 }}
-            />
-            <input
-              placeholder="Last Name *"
-              value={form.lastName}
-              onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-              required
-              style={{ padding: 16, fontSize: 18 }}
-            />
-          </div>
-
-          <div className="kioskTwoCol">
-            <input
-              placeholder="Email (recommended)"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              inputMode="email"
-              style={{ padding: 16, fontSize: 18 }}
-            />
-            <input
-              placeholder="Phone (recommended)"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              inputMode="tel"
-              style={{ padding: 16, fontSize: 18 }}
-            />
-          </div>
-
-          <select
-            value={form.schoolId}
-            onChange={(e) => setForm({ ...form, schoolId: e.target.value })}
-            required
-            style={{ padding: 16, fontSize: 18 }}
-          >
-            <option value="">Select your school *</option>
-            {schools.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-
-          <label style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 2px", userSelect: "none" }}>
-            <input
-              type="checkbox"
-              checked={form.consent}
-              onChange={(e) => setForm({ ...form, consent: e.target.checked })}
-              style={{ width: 22, height: 22 }}
-            />
-            <span style={{ fontSize: 16, color: "rgba(255,255,255,0.88)" }}>
-              I agree to be contacted by Xtylo about enrollment. *
-            </span>
-          </label>
-
-          <div className="spread" style={{ gap: 12 }}>
-            <button className="btn primary" disabled={!canSubmit} type="submit" style={{ padding: 14, fontSize: 18 }}>
-              {submitting ? "Submitting..." : "Submit"}
-            </button>
-            <button className="btn" type="button" onClick={hardResetForm} style={{ padding: 14, fontSize: 18 }} disabled={submitting}>
-              Clear
-            </button>
-          </div>
-
-          <small style={{ opacity: 0.8 }}>* Required fields. Provide at least an email or phone.</small>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

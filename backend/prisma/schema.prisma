@@ -23,18 +23,25 @@ model Campaign {
   isActive  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  students Student[]
-  messages OutreachMessage[]
+  students  Student[]
+  messages  OutreachMessage[]
+}
+
+enum AreaOfInterest {
+  COSMETOLOGY
+  BARBER
+  NAIL_TECHNICIAN
 }
 
 model Student {
-  id        Int      @id @default(autoincrement())
-  firstName String
-  lastName  String
-  email     String?
-  phone     String?
-  consent   Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id             Int            @id @default(autoincrement())
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  consent         Boolean        @default(false)
+  areaOfInterest  AreaOfInterest @default(COSMETOLOGY)
+  createdAt       DateTime       @default(now())
 
   schoolId   Int
   campaignId Int
@@ -43,10 +50,6 @@ model Student {
   campaign Campaign @relation(fields: [campaignId], references: [id])
 
   outreachLogs OutreachLog[]
-
-  @@index([campaignId])
-  @@index([email])
-  @@index([phone])
 }
 
 model OutreachMessage {

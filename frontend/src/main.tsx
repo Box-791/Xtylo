@@ -1,9 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+import "./index.css"; // MUST be imported so the theme loads
+import "./App.css";   // your shared styling (admin + kiosk)
+
 import App from "./App";
 import PublicIntake from "./PublicIntake";
-import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

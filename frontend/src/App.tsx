@@ -12,9 +12,8 @@ import {
   deleteStudent,
   updateStudent,
   exportCSV,
+  AreaOfInterest,
 } from "./api";
-
-import AdminSchools from "./AdminSchools"
 
 interface School {
   id: number;
@@ -39,6 +38,7 @@ interface Student {
   createdAt: string;
   school: School;
   campaign: Campaign;
+  areaOfInterest?: AreaOfInterest | string | null;
 }
 
 export default function App() {
@@ -55,6 +55,7 @@ export default function App() {
   // filters
   const [schoolId, setSchoolId] = useState<number | undefined>();
   const [campaignId, setCampaignId] = useState<number | undefined>();
+  const [interest, setInterest] = useState<AreaOfInterest | undefined>();
 
   // create campaign
   const [newCampaignName, setNewCampaignName] = useState("");
@@ -70,6 +71,7 @@ export default function App() {
     email: "",
     phone: "",
     schoolId: 0,
+    areaOfInterest: "COSMETOLOGY" as AreaOfInterest,
   });
 
   const activeCampaign = useMemo(
@@ -81,7 +83,7 @@ export default function App() {
     setError(null);
     try {
       const [st, sc, cp] = await Promise.all([
-        fetchStudents({ schoolId, campaignId }),
+        fetchStudents({ schoolId, campaignId, areaOfInterest: interest }),
         fetchSchools(),
         fetchCampaigns(),
       ]);
@@ -96,7 +98,7 @@ export default function App() {
   useEffect(() => {
     if (pinOk) loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinOk, schoolId, campaignId]);
+  }, [pinOk, schoolId, campaignId, interest]);
 
   function openEdit(s: Student) {
     setEditing(s);
@@ -106,6 +108,7 @@ export default function App() {
       email: s.email ?? "",
       phone: s.phone ?? "",
       schoolId: s.school.id,
+      areaOfInterest: (s.areaOfInterest as AreaOfInterest) || "COSMETOLOGY",
     });
   }
 
@@ -118,12 +121,20 @@ export default function App() {
         email: editForm.email.trim() || undefined,
         phone: editForm.phone.trim() || undefined,
         schoolId: editForm.schoolId,
+        areaOfInterest: editForm.areaOfInterest,
       });
       setEditing(null);
       await loadAll();
     } catch (e: any) {
       setError(e?.message || "Failed to update student.");
     }
+  }
+
+  function interestLabel(v: any) {
+    if (v === "COSMETOLOGY") return "Cosmetology";
+    if (v === "BARBER") return "Barber";
+    if (v === "NAIL_TECHNICIAN") return "Nail Technician";
+    return v ?? "-";
   }
 
   if (!pinOk) {
@@ -187,7 +198,14 @@ export default function App() {
       </div>
 
       {error && (
-        <div className="card" style={{ marginTop: 14, background: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.45)" }}>
+        <div
+          className="card"
+          style={{
+            marginTop: 14,
+            background: "rgba(239,68,68,0.12)",
+            borderColor: "rgba(239,68,68,0.45)",
+          }}
+        >
           <strong style={{ color: "#fecaca" }}>Error:</strong>{" "}
           <span style={{ color: "#fecaca", whiteSpace: "pre-wrap" }}>{error}</span>
         </div>
@@ -198,9 +216,7 @@ export default function App() {
         <div className="spread">
           <div>
             <h2>Export</h2>
-            <small>
-              Export respects your selection: choose a campaign filter, then export that campaign.
-            </small>
+            <small>Export respects your selection: choose a campaign filter, then export that campaign.</small>
           </div>
           <div className="row">
             <button className="btn" onClick={() => exportCSV()}>
@@ -250,7 +266,11 @@ export default function App() {
 
         <div style={{ marginTop: 12 }}>
           {campaigns.map((c) => (
-            <div key={c.id} className="spread" style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <div
+              key={c.id}
+              className="spread"
+              style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+            >
               <div>
                 <strong>{c.name}</strong>{" "}
                 {c.isActive ? <span className="badge good">active</span> : <span className="badge">inactive</span>}
@@ -346,11 +366,17 @@ export default function App() {
 
         <div style={{ marginTop: 12 }}>
           {schools.map((s) => (
-            <div key={s.id} className="spread" style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <div
+              key={s.id}
+              className="spread"
+              style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+            >
               <div>
                 <strong>{s.name}</strong>{" "}
                 <small>
-                  {s.city ? s.city : ""}{s.city && s.state ? ", " : ""}{s.state ? s.state : ""}
+                  {s.city ? s.city : ""}
+                  {s.city && s.state ? ", " : ""}
+                  {s.state ? s.state : ""}
                 </small>
               </div>
               <button
@@ -377,8 +403,9 @@ export default function App() {
         <div className="spread">
           <div>
             <h2>Students</h2>
-            <small>Use filters to export a specific campaign.</small>
+            <small>Use filters to export or review a specific group.</small>
           </div>
+
           <div className="row">
             <select
               value={schoolId ?? ""}
@@ -403,6 +430,18 @@ export default function App() {
                 </option>
               ))}
             </select>
+
+            {/* NEW: Interest filter */}
+            <select
+              value={interest ?? ""}
+              onChange={(e) => setInterest(e.target.value ? (e.target.value as AreaOfInterest) : undefined)}
+              style={{ minWidth: 220 }}
+            >
+              <option value="">All Interests</option>
+              <option value="COSMETOLOGY">Cosmetology</option>
+              <option value="BARBER">Barber</option>
+              <option value="NAIL_TECHNICIAN">Nail Technician</option>
+            </select>
           </div>
         </div>
 
@@ -415,6 +454,7 @@ export default function App() {
                 <th>Name</th>
                 <th>School</th>
                 <th>Campaign</th>
+                <th>Interest</th>
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Created</th>
@@ -431,6 +471,7 @@ export default function App() {
                     {s.campaign.name}{" "}
                     {s.campaign.isActive && <span className="badge good">active</span>}
                   </td>
+                  <td>{interestLabel(s.areaOfInterest)}</td>
                   <td>{s.email ?? "-"}</td>
                   <td>{s.phone ?? "-"}</td>
                   <td>{new Date(s.createdAt).toLocaleString()}</td>
@@ -454,7 +495,7 @@ export default function App() {
 
               {students.length === 0 && (
                 <tr>
-                  <td colSpan={7}><small>No students found.</small></td>
+                  <td colSpan={8}><small>No students found.</small></td>
                 </tr>
               )}
             </tbody>
@@ -506,6 +547,15 @@ export default function App() {
               {schools.map((sc) => (
                 <option key={sc.id} value={sc.id}>{sc.name}</option>
               ))}
+            </select>
+
+            <select
+              value={editForm.areaOfInterest}
+              onChange={(e) => setEditForm({ ...editForm, areaOfInterest: e.target.value as AreaOfInterest })}
+            >
+              <option value="COSMETOLOGY">Cosmetology</option>
+              <option value="BARBER">Barber</option>
+              <option value="NAIL_TECHNICIAN">Nail Technician</option>
             </select>
 
             <div className="row" style={{ justifyContent: "flex-end" }}>
