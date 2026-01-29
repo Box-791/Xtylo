@@ -2,275 +2,211 @@ import { useEffect, useMemo, useState } from "react";
 import {
   fetchSchools,
   createStudent,
-  AreaOfInterest,
+  AREA_OF_INTERESTS,
   AREA_OF_INTEREST_LABEL,
 } from "./api";
+import type { AreaOfInterest, School } from "./api";
 
-type School = {
-  id: number;
-  name: string;
-  city?: string | null;
-  state?: string | null;
-};
+import "./PublicIntake.css";
+
 
 export default function PublicIntake() {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [schoolId, setSchoolId] = useState<number | "">("");
-  const [areaOfInterest, setAreaOfInterest] = useState<AreaOfInterest>(
-    AreaOfInterest.COSMETOLOGY
-  );
-  const [consent, setConsent] = useState(false);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchSchools()
-      .then(setSchools)
-      .finally(() => setLoading(false));
-  }, []);
+  const [areaOfInterest, setAreaOfInterest] =
+    useState<AreaOfInterest>("COSMETOLOGY");
 
   const canSubmit = useMemo(() => {
-    const first = firstName.trim();
-    const last = lastName.trim();
-    const hasContact = email.trim() !== "" || phone.trim() !== "";
-    return Boolean(first && last && schoolId !== "" && hasContact && !submitting);
-  }, [firstName, lastName, email, phone, schoolId, submitting]);
+    const hasName = firstName.trim() && lastName.trim();
+    const hasSchool = schoolId !== "";
+    const hasContact = email.trim() || phone.trim(); // either is ok
+    return Boolean(hasName && hasSchool && hasContact && !submitting);
+  }, [firstName, lastName, schoolId, email, phone, submitting]);
 
-  async function submit(e: React.FormEvent) {
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const sc = await fetchSchools();
+        if (!alive) return;
+
+        // Filter out any schools that somehow have empty names
+        const clean = (Array.isArray(sc) ? sc : []).filter(
+          (s) => String(s?.name ?? "").trim().length > 0
+        );
+
+        setSchools(clean);
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e?.message || "Failed to load schools.");
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setOk(null);
+    setSuccess(null);
 
-    const first = firstName.trim();
-    const last = lastName.trim();
-    const emailStr = email.trim();
-    const phoneStr = phone.trim();
-
-    if (!first || !last || schoolId === "") {
-      setError("First name, last name, and school are required.");
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First name and last name are required.");
+      return;
+    }
+    if (schoolId === "") {
+      setError("Please select a school.");
+      return;
+    }
+    if (!email.trim() && !phone.trim()) {
+      setError("Please provide either an email or a phone number.");
       return;
     }
 
-    if (!emailStr && !phoneStr) {
-      setError("Please enter either an email or a phone number.");
-      return;
-    }
-
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-
       await createStudent({
-        firstName: first,
-        lastName: last,
-        email: emailStr || undefined,
-        phone: phoneStr || undefined,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
         schoolId: Number(schoolId),
         areaOfInterest,
-        consent,
       });
 
-      setOk("Thank you! Your information was submitted.");
-
-      // reset
+      setSuccess("Submitted. Thank you!");
       setFirstName("");
       setLastName("");
       setEmail("");
       setPhone("");
       setSchoolId("");
-      setAreaOfInterest(AreaOfInterest.COSMETOLOGY);
-      setConsent(false);
+      setAreaOfInterest("COSMETOLOGY");
     } catch (e: any) {
-      setError(e?.message || "Could not submit. Please try again.");
+      setError(e?.message || "Failed to submit. Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="container">
-      <div
-        className="card"
-        style={{
-          width: "min(820px, 100%)",
-          margin: "0 auto",
-          padding: 20,
-        }}
-      >
-        <h1 style={{ marginBottom: 6 }}>Interested in Beauty School?</h1>
-        <small>Please fill out the form below. Email or phone is required.</small>
+    <div className="pi-page">
+      <div className="pi-card">
+        <h1 className="pi-title">Interested in Beauty School?</h1>
+        <p className="pi-subtitle">
+          Please enter your information and we’ll reach out soon.
+        </p>
 
-        <div style={{ height: 16 }} />
+        {error && (
+          <div className="pi-alert pi-alert-error">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="pi-alert pi-alert-success">
+            <strong>{success}</strong>
+          </div>
+        )}
 
         {loading ? (
-          <p>Loading...</p>
+          <p className="pi-muted">Loading…</p>
         ) : (
-          <form onSubmit={submit}>
-            {/* GRID */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(12, 1fr)",
-                gap: 12,
-              }}
-            >
-              {/* First Name */}
-              <div style={{ gridColumn: "span 12" }}>
-                <label className="label">First Name</label>
+          <form onSubmit={onSubmit}>
+            <div className="pi-grid">
+              <div className="pi-field">
+                <label>First name</label>
                 <input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="First name"
-                  autoComplete="given-name"
                 />
               </div>
 
-              {/* Last Name */}
-              <div style={{ gridColumn: "span 12" }}>
-                <label className="label">Last Name</label>
+              <div className="pi-field">
+                <label>Last name</label>
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Last name"
-                  autoComplete="family-name"
                 />
               </div>
 
-              {/* On wider screens, use 2 columns */}
-              <style>
-                {`
-                  @media (min-width: 720px) {
-                    .kiosk-col-6 { grid-column: span 6 !important; }
-                    .kiosk-col-12 { grid-column: span 12 !important; }
-                  }
-                `}
-              </style>
-
-              {/* Email */}
-              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
-                <label className="label">Email</label>
+              <div className="pi-field">
+                <label>Email</label>
                 <input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  autoComplete="email"
+                  placeholder="Email"
                 />
               </div>
 
-              {/* Phone */}
-              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
-                <label className="label">Phone</label>
+              <div className="pi-field">
+                <label>Phone</label>
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(###) ###-####"
-                  autoComplete="tel"
+                  placeholder="Phone"
                 />
               </div>
 
-              {/* School */}
-              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
-                <label className="label">School</label>
+              <div className="pi-field">
+                <label>School</label>
                 <select
                   value={schoolId}
                   onChange={(e) =>
                     setSchoolId(e.target.value ? Number(e.target.value) : "")
                   }
                 >
-                  <option value="">Select a school</option>
+                  <option value="">Select school</option>
                   {schools.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
-                      {s.city || s.state
-                        ? ` — ${s.city ?? ""}${s.city && s.state ? ", " : ""}${
-                            s.state ?? ""
-                          }`
-                        : ""}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Area of Interest */}
-              <div className="kiosk-col-6" style={{ gridColumn: "span 12" }}>
-                <label className="label">Area of Interest</label>
+              <div className="pi-field">
+                <label>Area of interest</label>
                 <select
                   value={areaOfInterest}
                   onChange={(e) =>
                     setAreaOfInterest(e.target.value as AreaOfInterest)
                   }
                 >
-                  {Object.values(AreaOfInterest).map((v) => (
+                  {AREA_OF_INTERESTS.map((v) => (
                     <option key={v} value={v}>
                       {AREA_OF_INTEREST_LABEL[v]}
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
 
-              {/* Consent */}
-              <div className="kiosk-col-12" style={{ gridColumn: "span 12" }}>
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8, // closer spacing between checkbox and text
-                    padding: "10px 12px",
-                    border: "1px solid rgba(255,255,255,0.10)",
-                    borderRadius: 12,
-                    userSelect: "none",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                    style={{
-                      width: 18,
-                      height: 18,
-                      margin: 0, // removes default spacing that can cause "far apart"
-                    }}
-                  />
-                  <span style={{ lineHeight: 1.2 }}>
-                    I agree to be contacted by Xtylo.
-                  </span>
-                </label>
-              </div>
+            <button className="pi-btn" type="submit" disabled={!canSubmit}>
+              {submitting ? "Submitting…" : "Submit"}
+            </button>
 
-              {/* Messages */}
-              {error && (
-                <div style={{ gridColumn: "span 12", color: "#fecaca" }}>
-                  <strong>Error:</strong> {error}
-                </div>
-              )}
-
-              {ok && (
-                <div style={{ gridColumn: "span 12", color: "#bbf7d0" }}>
-                  <strong>{ok}</strong>
-                </div>
-              )}
-
-              {/* Submit */}
-              <div
-                style={{
-                  gridColumn: "span 12",
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  marginTop: 6,
-                }}
-              >
-                <button className="btn primary" type="submit" disabled={!canSubmit}>
-                  {submitting ? "Submitting..." : "Submit"}
-                </button>
-              </div>
+            <div className="pi-muted pi-footnote">
+              Provide at least one: email or phone.
             </div>
           </form>
         )}

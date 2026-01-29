@@ -26,6 +26,7 @@ services:
       DATABASE_URL: "postgresql://xtylo:xtylo_pass@db:5432/xtylo_db"
       ADMIN_PIN: "1234"
       NODE_ENV: "production"
+      TZ: "America/Phoenix"
     # Optional host port for debugging; keep or remove
     ports:
       - "4000:4000"

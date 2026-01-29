@@ -34,22 +34,53 @@ enum AreaOfInterest {
 }
 
 model Student {
-  id             Int            @id @default(autoincrement())
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String?
-  consent         Boolean        @default(false)
-  areaOfInterest  AreaOfInterest @default(COSMETOLOGY)
-  createdAt       DateTime       @default(now())
+  id               Int            @id @default(autoincrement())
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  createdAt        DateTime       @default(now())
 
-  schoolId   Int
-  campaignId Int
+  areaOfInterest   AreaOfInterest @default(COSMETOLOGY)
 
-  school   School   @relation(fields: [schoolId], references: [id])
-  campaign Campaign @relation(fields: [campaignId], references: [id])
+  // lifecycle flags (A)
+  contacted        Boolean        @default(false)
+  contactedAt      DateTime?
+  visitCompleted   Boolean        @default(false)
+  visitCompletedAt DateTime?
 
-  outreachLogs OutreachLog[]
+  schoolId         Int
+  campaignId       Int
+
+  school           School         @relation(fields: [schoolId], references: [id])
+  campaign         Campaign       @relation(fields: [campaignId], references: [id])
+
+  outreachLogs     OutreachLog[]
+  tourVisits       TourVisit[]
+}
+
+enum TourStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+model TourVisit {
+  id         Int        @id @default(autoincrement())
+  studentId  Int
+  // Start time of the tour (store as UTC ideally)
+  startsAt   DateTime
+  status     TourStatus @default(SCHEDULED)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  student    Student    @relation(fields: [studentId], references: [id])
+
+  @@index([startsAt])
+  @@index([studentId])
+  @@unique([startsAt]) // prevents double-booking same time slot
 }
 
 model OutreachMessage {
@@ -59,20 +90,20 @@ model OutreachMessage {
   message    String
   sentAt     DateTime @default(now())
 
-  campaign Campaign      @relation(fields: [campaignId], references: [id])
-  logs     OutreachLog[]
+  campaign   Campaign      @relation(fields: [campaignId], references: [id])
+  logs       OutreachLog[]
 }
 
 model OutreachLog {
-  id     Int            @id @default(autoincrement())
-  sentAt DateTime       @default(now())
-  status OutreachStatus
+  id        Int            @id @default(autoincrement())
+  sentAt    DateTime       @default(now())
+  status    OutreachStatus
 
   studentId Int
   messageId Int
 
-  student Student         @relation(fields: [studentId], references: [id])
-  message OutreachMessage @relation(fields: [messageId], references: [id])
+  student   Student         @relation(fields: [studentId], references: [id])
+  message   OutreachMessage @relation(fields: [messageId], references: [id])
 }
 
 enum OutreachChannel {
